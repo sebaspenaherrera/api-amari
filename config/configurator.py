@@ -1,6 +1,7 @@
 import pandas as pd
 import json
 from utils.utils import *
+from config.defaultParams import *
 
 config_path = './config/config.json'
 
@@ -17,14 +18,13 @@ def check_config_file():
     
     # Set the default parameters
     params = {
-        "API_APP": "rest.routes:app",
-        "API_HOST": "0.0.0.0",
-        "API_PORT": 8000,
-        "API_RELOAD": True,
-        "API_DATA_PATH": "./rest_data",
-        "API_N_SAMPLES": 20,
-        "API_AMARI_HOST": "192.168.159.160",
-        "API_AMARI_PORT": 5000
+        "API_APP": API_APP,
+        "API_HOST": API_HOST,
+        "API_PORT": API_PORT,
+        "API_RELOAD": API_RELOAD,
+        "API_DATA_PATH": API_DATA_PATH,
+        "AMARI_HOST": AMARI_HOST,
+        "AMARI_PORT": AMARI_PORT
         #TODO: Add the rest of the parameters
     }
 

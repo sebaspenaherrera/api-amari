@@ -17,9 +17,12 @@ TODO:
 - log_format: the log format
 '''
 
-API_APP = "rest.routes:app"
+API_APP = "rest.endpoints:app"
 API_PORT = 8000
 API_HOST = "0.0.0.0"
 API_RELOAD = True
 API_DATA_PATH = "./data"
 N_SAMPLES = 20
+HOST_NAME = "amari-api"
+AMARI_HOST = "192.168.159.160"
+AMARI_PORT = 5000

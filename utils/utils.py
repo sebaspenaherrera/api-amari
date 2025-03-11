@@ -1,6 +1,6 @@
 # *************************************************************************************************
 # REST utilities
-# Description: This file contains the synchronous/async methods that are used by the REST Server
+# Description: This file contains the I/O methods that are used by the REST Server
 # Author: Sebastian Peñaherrera
 # Date: 04/03/2025
 # Last Updated: 04/03/2025
