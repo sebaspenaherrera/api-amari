@@ -125,3 +125,9 @@ dmypy.json
 
 # Specific json configuration files
 /config/config.json
+
+# virtualenv
+.venv/
+
+# IDE
+.vscode/

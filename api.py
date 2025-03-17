@@ -23,6 +23,7 @@ if __name__ == "__main__":
     parser.add_argument('--port', type=int, help='REST host port', default=API_PORT)
     parser.add_argument('--amari-host', type=str, help="CROWDCELL'S host address", default=AMARI_HOST)
     parser.add_argument('--amari-port', type=int, help="CROWDCELL'S host port", default=AMARI_PORT)
+    parser.add_argument('--api-path', type=str, help="CROWDCELL'S path", default=AMARI_PATH)
 
     # Parse the command-line arguments
     args = parser.parse_args()
@@ -30,8 +31,9 @@ if __name__ == "__main__":
     # Extract key-value pair arguments
     ConfigManager.update_parameters("API_HOST", args.host)
     ConfigManager.update_parameters("API_PORT", args.port)
-    ConfigManager.update_parameters("API_AMARI_HOST", args.amari_host)
-    ConfigManager.update_parameters("API_AMARI_PORT", args.amari_port)
+    ConfigManager.update_parameters("AMARI_HOST", args.amari_host)
+    ConfigManager.update_parameters("AMARI_PORT", args.amari_port)
+    ConfigManager.update_parameters("AMARI_PATH", args.api_path)
 
     # Check if the local_data_path exists, if not create it
     check_local_data_path(ConfigManager.get_parameters('API_DATA_PATH'))

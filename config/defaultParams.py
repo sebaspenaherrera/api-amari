@@ -26,3 +26,4 @@ N_SAMPLES = 20
 HOST_NAME = "amari-api"
 AMARI_HOST = "192.168.159.160"
 AMARI_PORT = 5000
+AMARI_PATH = "/root/lteenb-linux-2024-12-13"

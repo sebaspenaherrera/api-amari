@@ -1,16 +1,17 @@
 # DEPENDENCIES
 # ------------------------------------------------------------------------------
-from fastapi import FastAPI, Query, Path, Body, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Query, Path, Body, HTTPException
 from fastapi.responses import FileResponse, Response
 from typing import Union, Annotated
+from starlette.responses import RedirectResponse
 from utils.network import NetworkTools as net
+from utils.cli import Cli as cli
 import os
-import asyncio
-import websockets
 import pandas as pd
 import subprocess
 
-#from models import SessionStats, example_POST_testbed, SampleStats, example_POST_demo
+from utils.parser import Parser
+from .models import * 
 
 #from Stats import Stats
 #from utils import *
@@ -21,23 +22,14 @@ import subprocess
 #stats = Stats(n_samples=n_samples)
 app = FastAPI()
 
-# FUNCTIONS
-async def execute_command(entity: str, message: dict):
-    """Runs the CLI command with a dynamic message."""
-    command = ["./ws.js", entity, message]
-    working_directory = "/root/lteenb-linux-2024-12-13"
-    
-    try:
-        result = subprocess.run(command, cwd=working_directory, capture_output=True, text=True, check=True)
-        return {"output": result.stdout}
-    except subprocess.CalledProcessError as e:
-        return {"error": e.stderr or str(e)}
 
-# ROUTES
-# ------------------------------------------------------------------------------
-@app.get("/")
-async def read_root():
-    return {"Hello": "World"}
+# ***************************************************** REST API ENDPOINTS ************************************************************
+
+# DEFAULT ENDPOINT ***************************************************************
+@app.get("/", tags=["Default"], include_in_schema=False)
+async def redirect_docs():
+    """Redirect to the documentation page"""
+    return RedirectResponse(url="/docs/")
 
 # Favicon
 favicon_path = os.path.join("./rest/static", "Mobilenet_sin-fondo-negro.svg")
@@ -47,22 +39,105 @@ async def favicon():
     response = FileResponse(favicon_path, media_type="image/svg+xml")
     response.headers["Cache-Control"] = "public, max-age=86400"  # Cache for 1 day
     return response
+# ***********************************************************************************
+
 
 # Generic GET endpoint
-@app.get("/get", tags=['Generic'])
-async def generic_get(ip: Annotated[str, Query] = '192.168.159.160',
-                      port: Annotated[int, Query(ge=1)] = 5000,
-                      resource: Annotated[str, Query] = None):
+'''@app.get("/{entity}", tags=['Generic'])
+async def get_parameter(
+                        entity: Annotated[str, Path] = "enb",
+                        param: Annotated[dict, Query] = None):
     
-    data, status, reason = await net.configure_http_request(request_type='GET', host_address=ip, port=port, resource=resource)
-    await net.process_http_response(response=data, status=status, reason=reason)
-    
-    return status
+    """Sends a GET message to Websocket AMARI API"""
+    output = await cli.execute_command(entity=entity, message={"message": "config_get"})
+    param_output = await Parser.search_parameter(params=output['output'], key="nr_cells")
+    return param_output'''
 
 
-# Get configuration
+@app.post("/{entity}", tags=['Generic'])
+async def generic_request(
+                            entity: Annotated[str, Path] = "enb",
+                            message: Annotated[dict, Body] = None):
+    '''Sends a message to Websocket AMARI API'''
+    try:
+        output = await cli.execute_command(entity=entity, message=message)
+        return output
+    except subprocess.CalledProcessError as e:
+        raise HTTPException(status_code=500, detail=f"Command execution failed: {e}")
+
+
+# Get configuration eNB
 @app.get("/enb/get_config", tags=["eNB"])
 async def get_eNB_config():
     '''Execute CLI command to get configuration from Websocket AMARI API'''
-    output = await execute_command(entity="enb", message={"message": "config_get"})
-    return output
+    try:
+        output = await cli.execute_command(entity="enb", message={"message": "config_get"})
+        return output
+    except subprocess.CalledProcessError as e:
+        raise HTTPException(status_code=500, detail=f"Command execution failed: {e}")
+
+
+@app.post("/enb/set_gain", tags=["eNB"])
+async def set_cell_gain(ConfigGain: Annotated[ConfigGain, Body()]):
+    '''Set the gain of a cell in the eNB'''
+    try:
+        configuration = ConfigGain.model_dump()
+        output = await cli.execute_command(entity="enb", message={"message":"cell_gain","cell_id":configuration["cell_id"],"gain":configuration["gain"]})
+        return output
+    except subprocess.CalledProcessError as e:
+        raise HTTPException(status_code=500, detail=f"Command execution failed: {e}")
+
+
+@app.post("/enb/set_inactivity_timer", tags=["eNB"])
+async def set_inactivity_timer(configuration: Annotated[ConfigCellTimer, Body()]):
+    '''Set the inactivity timer of the eNB'''
+
+    configuration = configuration.model_dump(by_alias=True)
+    configuration["message"] = "config_set"
+    try:
+        output = await cli.execute_command(entity="enb", message=configuration)
+        return output
+    except subprocess.CalledProcessError as e:
+        raise HTTPException(status_code=500, detail=f"Command execution failed: {e}")
+    
+
+@app.post("/enb/set_prb", tags=["eNB"])
+async def set_prb_allocation(prb_allocation: Annotated[ConfigCellPRB, Body()]):
+    '''Set the PRB allocation of the eNB'''
+
+    configuration = prb_allocation.model_dump(by_alias=True)
+    configuration["message"] = "config_set"
+
+    try:
+        output = await cli.execute_command(entity="enb", message=configuration)
+        return output
+    except subprocess.CalledProcessError as e:
+        raise HTTPException(status_code=500, detail=f"Command execution failed: {e}")
+    
+
+@app.post("/enb/set_ul_mcs", tags=["eNB"])
+async def set_ul_mcs(ul_mcs: Annotated[ConfigCellULMCS, Body()]):
+    '''Set the UL MCS of the eNB'''
+
+    configuration = ul_mcs.model_dump(by_alias=True)
+    configuration["message"] = "config_set"
+
+    try:
+        output = await cli.execute_command(entity="enb", message=configuration)
+        return output
+    except subprocess.CalledProcessError as e:
+        raise HTTPException(status_code=500, detail=f"Command execution failed: {e}")
+
+
+@app.post("/enb/get_stats", tags=["eNB"])
+async def get_stats(stats: Annotated[ConfigStats, Body()]):
+    '''Get the stats of the eNB'''
+
+    configuration = stats.model_dump(by_alias=True)
+    configuration["message"] = "stats"
+
+    try:
+        output = await cli.execute_command(entity="enb", message=configuration)
+        return output
+    except subprocess.CalledProcessError as e:
+        raise HTTPException(status_code=500, detail=f"Command execution failed: {e}")
