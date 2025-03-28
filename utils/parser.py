@@ -3,6 +3,7 @@ Description: This module contains the parser for the Amari API.
 """
 
 import json
+import re
 from utils.utils import log_message
 
 class Parser:
@@ -44,5 +45,50 @@ class Parser:
             return params[key]
         else:
             return None
-
         
+
+    @staticmethod
+    def extract_pdsch_messages(log_data, discard_si: bool = False) -> dict:
+        """Extracts PDSCH messages from the log data"""
+        pdsch_messages = {}
+        
+        # Check if response and logs exist
+        if log_data.get("status") and "response" in log_data and "logs" in log_data["response"]:
+            logs = log_data["response"]["logs"]
+            
+            # Iterate through logs and filter PDSCH channel messages
+            for log in logs:
+                if log.get("channel") == "PDSCH":
+                    if discard_si:
+                        if "si" not in log.get("data")[0]:
+                            pdsch_messages[log.get("timestamp")] = Parser.parse_log_data(log.get("data")[0])
+                        else:
+                            continue
+                    else:
+                        pdsch_messages[log.get("timestamp")] = Parser.parse_log_data(log.get("data")[0])
+
+        return pdsch_messages
+    
+
+    @staticmethod
+    def parse_log_data(line: list[str]) -> dict:
+        """Parses the data field from the log file"""
+
+        parsed_dict = {}
+        # Regular expression to match key-value pairs
+        matches = re.findall(r'(\w+)=([\w:.]+)', line)
+
+        for key, value in matches:
+            # If the value contains ":", split it into start and end
+            if ':' in value:
+                start, end = map(int, value.split(':'))
+                parsed_dict[f"{key}_start"] = start
+                parsed_dict[f"{key}_end"] = end
+            elif value.isdigit():
+                parsed_dict[key] = int(value)  # Convert to integer
+            elif re.match(r'^\d+\.\d+$', value):  
+                parsed_dict[key] = float(value)  # Convert to float
+            else:
+                parsed_dict[key] = value  # Keep as string if not numeric
+
+        return parsed_dict

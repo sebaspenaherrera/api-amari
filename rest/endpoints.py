@@ -41,19 +41,6 @@ async def favicon():
     return response
 # ***********************************************************************************
 
-
-# Generic GET endpoint
-'''@app.get("/{entity}", tags=['Generic'])
-async def get_parameter(
-                        entity: Annotated[str, Path] = "enb",
-                        param: Annotated[dict, Query] = None):
-    
-    """Sends a GET message to Websocket AMARI API"""
-    output = await cli.execute_command(entity=entity, message={"message": "config_get"})
-    param_output = await Parser.search_parameter(params=output['output'], key="nr_cells")
-    return param_output'''
-
-
 @app.post("/{entity}", tags=['Generic'])
 async def generic_request(
                             entity: Annotated[str, Path] = "enb",
@@ -80,11 +67,28 @@ async def get_eNB_config():
 @app.post("/enb/set_gain", tags=["eNB"])
 async def set_cell_gain(ConfigGain: Annotated[ConfigGain, Body()]):
     '''Set the gain of a cell in the eNB'''
+    
+    configuration = ConfigGain.model_dump()
+    configuration["message"] = "cell_gain"
+    
     try:
-        configuration = ConfigGain.model_dump()
-        output = await cli.execute_command(entity="enb", message={"message":"cell_gain","cell_id":configuration["cell_id"],"gain":configuration["gain"]})
+        output = await cli.execute_command(entity="enb", message=configuration)
         return output
     except subprocess.CalledProcessError as e:
+        raise HTTPException(status_code=500, detail=f"Command execution failed: {e}")
+    
+
+@app.post("/enb/set_noise_level", tags=["eNB"])
+async def set_noise_level(ConfigGain: Annotated[ConfigNoise, Body()]):
+    '''Set the noise level of a cell in the eNB. This functionality only works if CHANNEL SIMULATOR is ENABLED'''
+    
+    configuration = ConfigGain.model_dump()
+    configuration["message"] = "noise_level"
+
+    try:
+        output = await cli.execute_command(entity="enb", message=configuration)
+        return output
+    except subprocess.CalledProcessError as e:  
         raise HTTPException(status_code=500, detail=f"Command execution failed: {e}")
 
 
@@ -101,7 +105,7 @@ async def set_inactivity_timer(configuration: Annotated[ConfigCellTimer, Body()]
         raise HTTPException(status_code=500, detail=f"Command execution failed: {e}")
     
 
-@app.post("/enb/set_prb", tags=["eNB"])
+@app.post("/enb/set_dl_prb", tags=["eNB"])
 async def set_prb_allocation(prb_allocation: Annotated[ConfigCellPRB, Body()]):
     '''Set the PRB allocation of the eNB'''
 
@@ -114,6 +118,20 @@ async def set_prb_allocation(prb_allocation: Annotated[ConfigCellPRB, Body()]):
     except subprocess.CalledProcessError as e:
         raise HTTPException(status_code=500, detail=f"Command execution failed: {e}")
     
+
+@app.post("/enb/set_dl_mcs", tags=["eNB"])
+async def set_dl_mcs(dl_mcs: Annotated[ConfigCellDLMCS, Body()]):
+    '''Set the DL MCS of the eNB'''
+
+    configuration = dl_mcs.model_dump(by_alias=True)
+    configuration["message"] = "config_set"
+
+    try:
+        output = await cli.execute_command(entity="enb", message=configuration)
+        return output
+    except subprocess.CalledProcessError as e:
+        raise HTTPException(status_code=500, detail=f"Command execution failed: {e}")
+
 
 @app.post("/enb/set_ul_mcs", tags=["eNB"])
 async def set_ul_mcs(ul_mcs: Annotated[ConfigCellULMCS, Body()]):
@@ -135,6 +153,45 @@ async def get_stats(stats: Annotated[ConfigStats, Body()]):
 
     configuration = stats.model_dump(by_alias=True)
     configuration["message"] = "stats"
+
+    try:
+        output = await cli.execute_command(entity="enb", message=configuration)
+        return output
+    except subprocess.CalledProcessError as e:
+        raise HTTPException(status_code=500, detail=f"Command execution failed: {e}")
+    
+
+
+@app.post("/enb/get_pdsch_stats", tags=["eNB"])
+async def get_pdsch_stats(pdsch_stats: Annotated[ConfigPdschLog, Body()]):
+    '''Get the PDSCH resource allocation stats of the eNB'''
+
+    configuration = pdsch_stats.model_dump(by_alias=True, exclude_unset=True)
+    configuration["message"] = "log_get"
+
+    if configuration["discard_si"]:
+        configuration.pop("discard_si")
+        discard_si = True
+    else:
+        discard_si = False
+
+    try:
+        output = await cli.execute_command(entity="enb", message=configuration)
+
+        if output:
+            pdsch_messages = Parser.extract_pdsch_messages(output, discard_si)
+            return pdsch_messages
+        return output
+    except subprocess.CalledProcessError as e:
+        raise HTTPException(status_code=500, detail=f"Command execution failed: {e}")
+    
+
+@app.post("/ue/get_stats", tags=["UE"])
+async def get_ue_stats(stats: Annotated[UeStats, Body()]):
+    '''Get the stats of a UE connected to a eNB/gNB'''
+
+    configuration = stats.model_dump(by_alias=True, exclude_unset=True)
+    configuration["message"] = "ue_get"
 
     try:
         output = await cli.execute_command(entity="enb", message=configuration)

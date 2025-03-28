@@ -24,4 +24,4 @@ class Cli:
             response, status = Parser.parse_response(data=result.stdout)
             return {"status": status, "response": response}
         except subprocess.CalledProcessError as e:
-            return {"status": status, "response" : None, "error": e.stderr or str(e)}
+            return {"status": 500, "response" : None, "error": e.stderr or str(e)}
