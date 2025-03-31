@@ -9,6 +9,15 @@ from utils.utils import log_message
 class Parser:
 
     @staticmethod
+    def check_cli_error(code: int) -> bool:
+        """Checks if the CLI command returned an error."""
+        if code == 0:
+            return False
+        else:
+            return True
+        
+
+    @staticmethod
     def check_response(data: dict) -> bool:
         """Checks if the response is valid."""
         if "error" in data:

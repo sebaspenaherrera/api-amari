@@ -198,3 +198,59 @@ async def get_ue_stats(stats: Annotated[UeStats, Body()]):
         return output
     except subprocess.CalledProcessError as e:
         raise HTTPException(status_code=500, detail=f"Command execution failed: {e}")
+    
+
+@app.get("/network/service_reset", tags=["Amari management"])
+async def reset_service():
+    '''Reset the service of a UE connected to a eNB/gNB'''
+
+    try:
+        output = await cli.execute_cli_command(command=["service", "lte", "restart"])
+        if output["status"] == 200:
+            return {"status": True, "message": "Service reset successfully"}
+        else:
+            return {"status": False, "message": "Failed to reset service", "error": output["error"]}
+    except subprocess.CalledProcessError as e:
+        raise HTTPException(status_code=500, detail=f"Command execution failed: {e}")
+    
+
+@app.get("/network/service_status", tags=["Amari management"])
+async def get_service_status():
+    '''Get the status of the service of a UE connected to a eNB/gNB'''
+
+    try:
+        output = await cli.execute_cli_command(command=["service", "lte", "status"])
+        if output["status"] == 200:
+            return {"status": True, "message": "Service is running", "info": output["response"]}
+        else:
+            return {"status": False, "message": "Service is not running", "error": output["error"], "info": output["response"]}
+    except subprocess.CalledProcessError as e:
+        raise HTTPException(status_code=500, detail=f"Command execution failed: {e}")
+    
+
+@app.get("/network/service_stop", tags=["Amari management"])
+async def stop_service():
+    '''Stop the service of a UE connected to a eNB/gNB'''
+
+    try:
+        output = await cli.execute_cli_command(command=["service", "lte", "stop"])
+        if output["status"] == 200:
+            return {"status": True, "message": "Service stopped successfully"}
+        else:
+            return {"status": False, "message": "Failed to stop service", "error": output["error"]}
+    except subprocess.CalledProcessError as e:
+        raise HTTPException(status_code=500, detail=f"Command execution failed: {e}")
+    
+
+@app.get("/network/service_start", tags=["Amari management"])
+async def start_service():
+    '''Start the service of a UE connected to a eNB/gNB'''
+
+    try:
+        output = await cli.execute_cli_command(command=["service", "lte", "start"])
+        if output["status"] == 200:
+            return {"status": True, "message": "Service started successfully"}
+        else:
+            return {"status": False, "message": "Failed to start service", "error": output["error"]}
+    except subprocess.CalledProcessError as e:
+        raise HTTPException(status_code=500, detail=f"Command execution failed: {e}")

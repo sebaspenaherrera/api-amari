@@ -40,6 +40,18 @@ def get_date():
     return date
 
 
+def get_abs_path(path: str):
+    """
+    Return the absolute path of a given path
+    Parameters:
+    path: str. The path to be converted
+
+    Returns:
+    - The absolute path
+    """
+    return os.path.abspath(path)
+
+
 def get_time():
     '''
     Return the current time
@@ -179,6 +191,21 @@ def convert_dict_to_json(data: dict):
     
     # Convert the dict to json
     return json.dumps(data, indent=4)
+
+
+def read_json_from_string(json_string: str):
+    '''
+    Read a json string and return it as a dictionary
+
+    Parameters:
+    - json_string: str. The json string to be parsed
+
+    Returns:
+    - The parsed json: dict
+    '''
+    
+    # Convert the string to json
+    return json.loads(json_string)
 
 
 def generate_file_path(timestamp: str, dir_path: str):
