@@ -1,10 +1,17 @@
 from pydantic import BaseModel, Field
 from typing import Dict, Annotated, Optional
 
-class ConfigPRB(BaseModel):
+class ConfigDLPRB(BaseModel):
     rb_l_crb: int = Field(default=20, ge=1, le=106, alias="pdsch_fixed_l_crb") 
     pdsch_fixed_rb_alloc: bool = Field(default=True, alias="pdsch_fixed_rb_alloc")
     rb_start: int | None = Field(default=0, ge=0, alias="pdsch_fixed_rb_start")
+
+
+class ConfigULPRB(BaseModel):
+    pusch_fixed_l_crb: int = Field(default=20, ge=1, le=106, alias="pusch_fixed_l_crb")
+    pusch_fixed_rb_alloc: bool = Field(default=True, alias="pusch_fixed_rb_alloc")
+    rb_start: int | None = Field(default=0, ge=0, alias="pusch_fixed_rb_start")
+
 
 class ConfigGain(BaseModel):
     gain: int = Field(default=0, ge=-30)
@@ -28,7 +35,7 @@ class ConfigNoise(BaseModel):
 
 
 class ConfigTimer(BaseModel):
-    timer: int = Field(default=0, ge=0, alias="inactivity_timer")
+    timer: int = Field(default=0, ge=0, le=90000, alias="inactivity_timer")
 
 
 class ConfigULMCS(BaseModel):
@@ -85,25 +92,77 @@ class ConfigPdschLog(BaseModel):
                     "allow_empty":False, 
                     "timeout":1,
                     "short":True,
-                    "discard_si":True,
+                    "discard_si":True
                 }    
             ]
         }
     }
 
 
-class ConfigCellPRB(BaseModel):
-    cells: Dict[int, ConfigPRB] = Field(default_factory=dict, description="Dictionary where KEYS are cell IDs (as strings) and values are configurations")
+class ConfigCellAlloc(BaseModel):
+    cells: Dict[int, ConfigDLPRB | ConfigULPRB] = Field(default_factory=dict, description="Dictionary where KEYS are cell IDs (as strings) and values are configurations")
 
     model_config = {
         "json_schema_extra": {
             "examples": [
                 {
                     "cells": {"1": {"pdsch_fixed_l_crb": 20, "pdsch_fixed_rb_alloc": True, "pdsch_fixed_rb_start": 0}}
+                },
+                {
+                    "cells": {"1": {"pusch_fixed_l_crb": 20, "pusch_fixed_rb_alloc": True, "pusch_fixed_rb_start": 0}}
                 }
             ]
         }
     }
+
+examples_config_cell_alloc = {"DL": {
+                    "summary": "DL PRB allocation",
+                    "description": "Set the DL PRB allocation of the eNB",
+                    "value": {
+                        "cells": {"1": {"pdsch_fixed_l_crb": 20, "pdsch_fixed_rb_alloc": True, "pdsch_fixed_rb_start": 0}}
+                    },
+                },
+                "UL": {
+                    "description": "Set the UL PRB allocation of the eNB",
+                    "summary": "UL PRB allocation",
+                    "value": {
+                        "cells": {"1": {"pusch_fixed_l_crb": 20, "pusch_fixed_rb_alloc": True, "pusch_fixed_rb_start": 0}}
+                    },
+                },
+            }
+
+
+class ConfigCellMCS(BaseModel):
+    cells: Dict[int, ConfigULMCS | ConfigDLMCS] = Field(default_factory=dict, description="Dictionary where KEYS are cell IDs (as strings) and values are configurations")
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "cells": {"1": {"pusch_mcs": 28}}
+                },
+                {
+                    "cells": {"1": {"pdsch_mcs": 28}}
+                }
+            ]
+        }
+    }
+
+examples_config_cell_mcs = {
+    "UL": {
+        "summary": "UL MCS allocation",
+        "description": "Set the UL MCS allocation of the eNB",
+        "value": {
+            "cells": {"1": {"pusch_mcs": 28}}
+        },
+    },
+    "DL": {
+        "description": "Set the DL MCS allocation of the eNB",
+        "summary": "DL MCS allocation",
+        "value": {
+            "cells": {"1": {"pdsch_mcs": 28}}
+        },
+    },
+}
 
 
 class ConfigCellTimer(BaseModel):
@@ -113,7 +172,7 @@ class ConfigCellTimer(BaseModel):
         "json_schema_extra": {
             "examples": [
                 {
-                    "cells": {"1": {"inactivity_timer": 60000}}
+                    "cells": {"1": {"inactivity_timer": 2560}}
                 }
             ]
         }
@@ -158,6 +217,25 @@ class UeStats(BaseModel):
                 {
                     "ue_id": 0,
                     "stats": False,
+                }
+            ]
+        }
+    }
+
+
+# *********************************************** CORE MODELS ***********************************************
+class UeCore(BaseModel):
+    imsi: str | None = Field(default="001010123456789")
+    nai: str | None = Field(default="001010123456789")
+    imei: str | None = Field(default="8668870435174501")
+    type: str | None = Field(default="both")
+    radio_capabilities: bool | None = Field(default=False, alias="radio_capabilities")
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "type":"both"
                 }
             ]
         }
