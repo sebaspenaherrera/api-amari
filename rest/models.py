@@ -39,17 +39,17 @@ class ConfigTimer(BaseModel):
 
 
 class ConfigULMCS(BaseModel):
-    pusch_mcs: int = Field(default=0, ge=0, le=28, alias="pusch_mcs")
+    pusch_mcs: int = Field(default=-1, ge=-1, le=28, alias="pusch_mcs")
 
 
 class ConfigDLMCS(BaseModel):
-    pdsch_mcs: int = Field(default=0, ge=0, le=28, alias="pdsch_mcs")
+    pdsch_mcs: int = Field(default=-1, ge=-1, le=28, alias="pdsch_mcs")
 
 
 class ConfigStats(BaseModel):
     samples: bool = Field(default=True, alias="samples")
     rf: bool | None = Field(default=True, alias="rf")
-    initial_delay: float | None = Field(default=0.7, alias="Initial_delay")
+    initial_delay: float | None = Field(default=0.4, alias="Initial_delay")
 
     model_config = {
         "json_schema_extra": {
@@ -57,7 +57,7 @@ class ConfigStats(BaseModel):
                 {
                     "samples": True,
                     "rf": True,
-                    "Initial_delay": 0.7
+                    "Initial_delay": 0.4
                 }
             ]
         }
@@ -70,8 +70,9 @@ class Layers(BaseModel):
     payload: int = Field(default=False)
 
 
-class ConfigPdschLog(BaseModel):
+class ConfigLogParser(BaseModel):
     layers: str | Dict[str, Layers] = Field(default="PHY")
+    channels: list | None = Field(default=["PDSCH"])
     max: int = Field(default=100, ge=1, le=4096)
     min: int = Field(default=1, ge=1, le=4096)
     timeout: int | None = Field(default=None, ge=1, le=60)
@@ -87,8 +88,10 @@ class ConfigPdschLog(BaseModel):
         "json_schema_extra":{
             "examples": [
                 {
+                    "channels": ["PDSCH"],
                     "layers":"PHY",
-                    "max":10, 
+                    "max":10,
+                    "min":1, 
                     "allow_empty":False, 
                     "timeout":1,
                     "short":True,
@@ -97,6 +100,48 @@ class ConfigPdschLog(BaseModel):
             ]
         }
     }
+
+examples_log_parser = {
+                "PDSCH": {
+                    "summary": "PDSCH allocation",
+                    "description": "Set the PDSCH log parser",
+                    "value": {
+                        "channels": ["PDSCH"],
+                        "layers":"PHY",
+                        "max":10,
+                        "min":1, 
+                        "allow_empty":False, 
+                        "timeout":1,
+                        "short":True,
+                        "discard_si":True
+                }},
+                "PUSCH": {
+                    "summary": "PUSCH allocation",
+                    "description": "Set the PUSCH log parser",
+                    "value": {
+                        "channels": ["PUSCH"],
+                        "layers":"PHY",
+                        "max":10,
+                        "min":1, 
+                        "allow_empty":False, 
+                        "timeout":1,
+                        "short":True,
+                        "discard_si":True
+                    }},
+                "Multiple channels": {
+                    "summary": "Multiple channels info",
+                    "description": "Fetch multiple channels information",
+                    "value": {
+                        "channels": ["PDSCH", "PUSCH"],
+                        "layers":"PHY",
+                        "max":10,
+                        "min":1, 
+                        "allow_empty":False, 
+                        "timeout":1,
+                        "short":True,
+                        "discard_si":True
+                    }}
+            }
 
 
 class ConfigCellAlloc(BaseModel):
@@ -215,8 +260,11 @@ class UeStats(BaseModel):
         "json_schema_extra": {
             "examples": [
                 {
-                    "ue_id": 0,
+                    "stats": True,
+                },
+                {
                     "stats": False,
+                    "ue_id": 39001
                 }
             ]
         }

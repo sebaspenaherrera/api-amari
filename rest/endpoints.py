@@ -28,30 +28,28 @@ Service API that exposes some functionalities. It has been designed in a modular
 You can **send generic** Remote API commands (Syntaxis is the same as the established in AMARISOFT documentation) 
 For more information, please refer to: [eNB/gNB remote API](https://tech-academy.amarisoft.com/lteenb.doc#Remote-API-1) and [Remote API](https://tech-academy.amarisoft.com/RemoteAPI.html)
 
-## gNB
-
-You will be able to:
-
-* Modify the cell gain
-* Modify the noise level (Only avaialble is **channel simulator** is **enabled**)
-* Modify the inactivity timer
-* Modify the PRB allocation
-* Modify the DL MCS
-* Modify the UL MCS
-* Get the stats of the gNB
-* Get the PDSCH resource allocation stats
-* Get the configuration of the gNB
-
-## UE
-You will be able to:
-* Get the stats of a UE connected to a gNB/eNB
-
 ## AMARI management
 You will be able to:
-* **Reset** the AMARISOFT service
-* Get the **status** of the AMARISOFT service
-* **Stop** the AMARISOFT service
-* **Start** the AMARISOFT service
+* **Reset**, **Stop**, **Start** and get the **status** of the AMARI service.
+
+## gNB
+
+* **Modify** the cell gain, noise level, inactivity timer, PRB allocation, MCS, and get the stats of a gNB.
+* Get the **configuration** of a gNB.
+* Get the **channel** stats of a gNB (e.g. PDSCH, PUSCH, ...).
+* **Reset** the logs of a gNB.
+* Get the **stats** of a gNB.
+
+## UE
+
+* Get the stats of an specific UE connected to a gNB/eNB
+
+## Network core
+* Get the **configuration** of the **core** network (MME).
+* Get the **stats** of the core network.
+* Get the **gNBs attached** to the core network (MME).
+* Get the **stats** of the **UEs** connected to the network core (MME).
+
 
 ## TODO
 * **CPU Monitoring** (_not implemented_).
@@ -61,9 +59,11 @@ You will be able to:
 app = FastAPI(title="Network-in-a-box API", version="1.0.0", summary="MobileNet API for Network-in-a-box service management", description=description)
 
 
-# ***************************************************** REST API ENDPOINTS ************************************************************
+#*************************************************************************************************************************************
+#******************************************** Internal ENDPOINTS (non-visible) *******************************************************
+#*************************************************************************************************************************************
 
-# DEFAULT ENDPOINT ***************************************************************
+# DEFAULT ROUTE (Redirect home page)
 @app.get("/", tags=["Default"], include_in_schema=False)
 async def redirect_docs():
     """Redirect to the documentation page"""
@@ -77,7 +77,24 @@ async def favicon():
     response = FileResponse(favicon_path, media_type="image/svg+xml")
     response.headers["Cache-Control"] = "public, max-age=86400"  # Cache for 1 day
     return response
-# ***********************************************************************************
+
+
+#*************************************************************************************************************************************
+#*************************************************** Generic ENDPOINTS ***************************************************************
+#*************************************************************************************************************************************
+
+@app.get("/get_help", tags=["Generic"])
+async def get_help():
+    '''**Provides** a list of **available messages** that can be sent to the AMARISOFT Remote API through the **generic request endpoint**.
+    
+    For more information, please refer to: [eNB/gNB remote API](https://tech-academy.amarisoft.com/lteenb.doc#Remote-API-1) and [Remote API](https://tech-academy.amarisoft.com/RemoteAPI.html)
+    '''
+    try:
+        output = await cli.execute_command(entity="enb", message={"message": "help"})
+        return output
+    except subprocess.CalledProcessError as e:
+        raise HTTPException(status_code=500, detail=f"Command execution failed: {e}")
+    
 
 @app.post("/{entity}", tags=['Generic'])
 async def generic_request(
@@ -100,9 +117,72 @@ async def generic_request(
         return output
     except subprocess.CalledProcessError as e:
         raise HTTPException(status_code=500, detail=f"Command execution failed: {e}")
+    
 
+# ********************************************************************************************************************************************
+# ************************************************** NETWORK MANAGEMENT ENDPOINTS ************************************************************
+# ********************************************************************************************************************************************
 
-# Get configuration eNB
+@app.get("/network/service_reset", tags=["Amari management"])
+async def reset_service():
+    '''**Reset** the AMARI service'''
+
+    try:
+        output = await cli.execute_cli_command(command=["service", "lte", "restart"])
+        if output["status"] == 200:
+            return {"status": True, "message": "Service reset successfully"}
+        else:
+            return {"status": False, "message": "Failed to reset service", "error": output["error"]}
+    except subprocess.CalledProcessError as e:
+        raise HTTPException(status_code=500, detail=f"Command execution failed: {e}")
+    
+
+@app.get("/network/service_status", tags=["Amari management"])
+async def get_service_status():
+    '''**Get** the **status** of AMARI service'''
+
+    try:
+        output = await cli.execute_cli_command(command=["service", "lte", "status"])
+        if output["status"] == 200:
+            return {"status": True, "message": "Service is running", "info": output["response"]}
+        else:
+            return {"status": False, "message": "Service is not running", "error": output["error"], "info": output["response"]}
+    except subprocess.CalledProcessError as e:
+        raise HTTPException(status_code=500, detail=f"Command execution failed: {e}")
+    
+
+@app.get("/network/service_stop", tags=["Amari management"])
+async def stop_service():
+    '''**Stops** the AMARI service'''
+
+    try:
+        output = await cli.execute_cli_command(command=["service", "lte", "stop"])
+        if output["status"] == 200:
+            return {"status": True, "message": "Service stopped successfully"}
+        else:
+            return {"status": False, "message": "Failed to stop service", "error": output["error"]}
+    except subprocess.CalledProcessError as e:
+        raise HTTPException(status_code=500, detail=f"Command execution failed: {e}")
+    
+
+@app.get("/network/service_start", tags=["Amari management"])
+async def start_service():
+    '''**Starts** the AMARI service'''
+
+    try:
+        output = await cli.execute_cli_command(command=["service", "lte", "start"])
+        if output["status"] == 200:
+            return {"status": True, "message": "Service started successfully"}
+        else:
+            return {"status": False, "message": "Failed to start service", "error": output["error"]}
+    except subprocess.CalledProcessError as e:
+        raise HTTPException(status_code=500, detail=f"Command execution failed: {e}")
+    
+
+#*************************************************************************************************************************************
+#*************************************************** gNB ENDPOINTS *******************************************************************
+#*************************************************************************************************************************************
+
 @app.get("/enb/get_config", tags=["gNB"])
 async def get_eNB_config():
     '''Sends a **gNB configuration** get message to the Websocket AMARI API'''
@@ -230,7 +310,7 @@ async def get_stats(stats: Annotated[ConfigStats, Body()]):
     The value of the key should be a dictionary containing the following fields:
     * **samples**: The number of samples to be collected, if possible.
     * **rf**: A boolean indicating whether to collect RF stats or not.
-    * **Initial_delay**: The initial delay in seconds before collecting the stats, by default 0.7 seconds.
+    * **Initial_delay**: The initial delay in seconds before collecting the stats, by default 0.4 seconds.
 
     If the configuration is set, the **status** field of the response will be `True` and the **message** field will be `stats`.
     '''
@@ -245,11 +325,32 @@ async def get_stats(stats: Annotated[ConfigStats, Body()]):
         raise HTTPException(status_code=500, detail=f"Command execution failed: {e}")
     
 
-@app.post("/enb/get_pdsch_stats", tags=["gNB"])
-async def get_pdsch_stats(pdsch_stats: Annotated[ConfigPdschLog, Body()]):
-    '''Get the PDSCH resource allocation stats of the eNB'''
+@app.post("/enb/get_channel_stats", tags=["gNB"])
+async def get_channel_stats(log_stats: Annotated[ConfigLogParser, Body(openapi_examples=examples_log_parser)]):
+    '''Get the gNB **channel stats** and information. It returns the parsed log messages stored in the gNB. It can be used to fetch the channel allocation.
+    
+    The value of the key should be a dictionary containing the following fields:
+    * **layers**: The layers to be collected (e.g., `{"PHY": {"level": "debug", "max_size": 1, "payload": False}}`).
+    * **max**: The maximum number of samples to be collected, if possible.
+    * **min**: The minimum number of samples to be collected, if possible.
+    * **short**: A boolean indicating whether to collect short stats or verbose (parsing not implemented yet).
+    * **allow_empty**: A boolean indicating whether to allow empty stats or not.
 
-    configuration = pdsch_stats.model_dump(by_alias=True, exclude_unset=True)
+    The following are optional:
+    * **channels**: The channels to be collected (e.g., `["PDSCH", "PUSCH"]`. By default, PDSCH will be fetched ).
+    * **discard_si**: A boolean indicating whether to discard SI (System Information) stats or not.
+    * **samples**: The number of samples to be collected, if possible.
+    * **Initial_delay**: The initial delay in seconds before collecting the stats, by default 0.7 seconds.
+    * **timeout**: The timeout in seconds for collecting the stats.
+    * **start_timestamp**: The start timestamp for collecting the stats.
+    * **end_timestamp**: The end timestamp for collecting the stats.
+    * **ue_id**: The ID of the UE (e.g., `1`, `2`). If UE not found, it will return an empty list.
+    * **rnti**: The RNTI (Radio Network Temporary Identifier) of the UE (e.g., `1`, `2`). If UE not found, it will return an empty list.
+    
+    If the configuration is set, the **status** field of the response will be `True` and the **message** field will be `log_get`.
+    '''
+
+    configuration = log_stats.model_dump(by_alias=True, exclude_unset=True)
     configuration["message"] = "log_get"
 
     if configuration["discard_si"]:
@@ -258,12 +359,27 @@ async def get_pdsch_stats(pdsch_stats: Annotated[ConfigPdschLog, Body()]):
     else:
         discard_si = False
 
+    if configuration["channels"]:
+        channels = configuration["channels"]
+        configuration.pop("channels")
+
     try:
         output = await cli.execute_command(entity="enb", message=configuration)
 
         if output:
-            pdsch_messages = Parser.extract_pdsch_messages(output, discard_si)
-            return pdsch_messages
+            pdsch_messages = Parser.extract_channel_log_messages(log_data=output, discard_si=discard_si, channel=channels)
+            return {"status": True, "message": "log_get", "response": pdsch_messages}
+        return {"status": False, "message": "log_get", "response": "No logs found"}
+    except subprocess.CalledProcessError as e:
+        raise HTTPException(status_code=500, detail=f"Command execution failed: {e}")
+    
+
+@app.get("/enb/reset_log", tags=["gNB"])
+async def reset_log_amari():
+    '''**Resets** the **logs** of the gNB. This will clear all the logs stored in the gNB.'''
+
+    try:
+        output = await cli.execute_command(entity="enb", message={"message": "log_reset"})
         return output
     except subprocess.CalledProcessError as e:
         raise HTTPException(status_code=500, detail=f"Command execution failed: {e}")
@@ -271,7 +387,14 @@ async def get_pdsch_stats(pdsch_stats: Annotated[ConfigPdschLog, Body()]):
 
 @app.post("/ue/get_stats", tags=["UE"])
 async def get_ue_stats(stats: Annotated[UeStats, Body()]):
-    '''Get the stats of a UE connected to a eNB/gNB'''
+    '''**Get** the **stats** of an **UE** connected to a eNB/gNB
+    The value of the key may be a dictionary containing the following fields:
+    * **ue_id**: The ID of the UE (e.g., `1`, `2`).
+    * **stats**: A boolean indicating whether to collect stats or not.
+    
+    If the configuration is set, the **status** field of the response will be `True` and the **message** field will be `ue_get`.
+    
+    Note: The field `ue_id` is optional. If not specified, the stats of all UEs will be collected.'''
 
     configuration = stats.model_dump(by_alias=True, exclude_unset=True)
     configuration["message"] = "ue_get"
@@ -283,63 +406,10 @@ async def get_ue_stats(stats: Annotated[UeStats, Body()]):
         raise HTTPException(status_code=500, detail=f"Command execution failed: {e}")
     
 
-@app.get("/network/service_reset", tags=["Amari management"])
-async def reset_service():
-    '''Reset the service of a UE connected to a eNB/gNB'''
+# **************************************************************************************************************************************
+# ************************************************** NETWORK CORE ENDPOINTS ************************************************************
+# ************************************************************************************************************************************** 
 
-    try:
-        output = await cli.execute_cli_command(command=["service", "lte", "restart"])
-        if output["status"] == 200:
-            return {"status": True, "message": "Service reset successfully"}
-        else:
-            return {"status": False, "message": "Failed to reset service", "error": output["error"]}
-    except subprocess.CalledProcessError as e:
-        raise HTTPException(status_code=500, detail=f"Command execution failed: {e}")
-    
-
-@app.get("/network/service_status", tags=["Amari management"])
-async def get_service_status():
-    '''Get the status of the service of a UE connected to a eNB/gNB'''
-
-    try:
-        output = await cli.execute_cli_command(command=["service", "lte", "status"])
-        if output["status"] == 200:
-            return {"status": True, "message": "Service is running", "info": output["response"]}
-        else:
-            return {"status": False, "message": "Service is not running", "error": output["error"], "info": output["response"]}
-    except subprocess.CalledProcessError as e:
-        raise HTTPException(status_code=500, detail=f"Command execution failed: {e}")
-    
-
-@app.get("/network/service_stop", tags=["Amari management"])
-async def stop_service():
-    '''Stop the service of a UE connected to a eNB/gNB'''
-
-    try:
-        output = await cli.execute_cli_command(command=["service", "lte", "stop"])
-        if output["status"] == 200:
-            return {"status": True, "message": "Service stopped successfully"}
-        else:
-            return {"status": False, "message": "Failed to stop service", "error": output["error"]}
-    except subprocess.CalledProcessError as e:
-        raise HTTPException(status_code=500, detail=f"Command execution failed: {e}")
-    
-
-@app.get("/network/service_start", tags=["Amari management"])
-async def start_service():
-    '''Start the service of a UE connected to a eNB/gNB'''
-
-    try:
-        output = await cli.execute_cli_command(command=["service", "lte", "start"])
-        if output["status"] == 200:
-            return {"status": True, "message": "Service started successfully"}
-        else:
-            return {"status": False, "message": "Failed to start service", "error": output["error"]}
-    except subprocess.CalledProcessError as e:
-        raise HTTPException(status_code=500, detail=f"Command execution failed: {e}")
-    
-
-# ************************************************** CORE NETWORK ENDPOINTS ************************************************************
 @app.get("/core/get_config", tags=["Network core"])
 async def get_core_config():
     '''Get the configuration of the core network (MME)'''

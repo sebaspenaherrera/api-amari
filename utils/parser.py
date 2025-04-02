@@ -57,7 +57,7 @@ class Parser:
         
 
     @staticmethod
-    def extract_pdsch_messages(log_data, discard_si: bool = False) -> dict:
+    def extract_channel_log_messages(log_data, discard_si: bool = False, channel:list = ['PDSCH']) -> dict:
         """Extracts PDSCH messages from the log data"""
         pdsch_messages = {}
         
@@ -65,9 +65,9 @@ class Parser:
         if log_data.get("status") and "response" in log_data and "logs" in log_data["response"]:
             logs = log_data["response"]["logs"]
             
-            # Iterate through logs and filter PDSCH channel messages
+            # Iterate through logs and filter specific channel messages
             for log in logs:
-                if log.get("channel") == "PDSCH":
+                if log.get("channel") in channel:
                     if discard_si:
                         if "si" not in log.get("data")[0]:
                             pdsch_messages[log.get("timestamp")] = Parser.parse_log_data(log.get("data")[0])
@@ -75,6 +75,8 @@ class Parser:
                             continue
                     else:
                         pdsch_messages[log.get("timestamp")] = Parser.parse_log_data(log.get("data")[0])
+
+                    pdsch_messages[log.get("timestamp")]["channel"] = log.get("channel")
 
         return pdsch_messages
     
