@@ -1,11 +1,14 @@
 # DEPENDENCIES
 # ------------------------------------------------------------------------------
-from fastapi import FastAPI, Query, Path, Body, HTTPException
+from fastapi import FastAPI, Query, Path, Body, HTTPException, Depends, status
+from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.responses import FileResponse, Response
 from typing import Union, Annotated
 from starlette.responses import RedirectResponse
 from utils.network import NetworkTools as net
 from utils.cli import Cli as cli
+from auth.auth import fake_users_db, User, UserInDB, get_current_active_user, authenticate_user, create_access_token, Token, ACCESS_TOKEN_EXPIRE_MINUTES
+from datetime import timedelta
 import os
 import pandas as pd
 import subprocess
@@ -63,7 +66,45 @@ app = FastAPI(title="Network-in-a-box API", version="1.0.0", summary="MobileNet 
 #*************************************************** AUTHORIZATION *******************************************************************
 #*************************************************************************************************************************************
 
+@app.post("/token")
+async def login_for_access_token(
+    form_data: Annotated[OAuth2PasswordRequestForm, Depends()]) -> Token:
+    """Login for access token.
+    Parameters:
+    - form_data: The form data containing the username and password.
+    
+    Returns:
+    - Token: The access token and token type.
+    Raises:
+    - HTTPException: If the username or password is incorrect.
+    """
 
+    user = authenticate_user(fake_users_db, form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.username}, expires_delta=access_token_expires
+    )
+    return Token(access_token=access_token, token_type="bearer")
+
+
+@app.get("/users/me")
+async def read_users_me(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+):
+    return current_user
+
+
+@app.get("/users/me/items/")
+async def read_own_items(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+):
+    return [{"item_id": "Foo", "owner": current_user.username}]
 
 #*************************************************************************************************************************************
 #******************************************** Internal ENDPOINTS (non-visible) *******************************************************
@@ -90,7 +131,7 @@ async def favicon():
 #*************************************************************************************************************************************
 
 @app.get("/get_help", tags=["Generic"])
-async def get_help():
+async def get_help(current_user: Annotated[User, Depends(get_current_active_user)]):
     '''**Provides** a list of **available messages** that can be sent to the AMARISOFT Remote API through the **generic request endpoint**.
     
     For more information, please refer to: [eNB/gNB remote API](https://tech-academy.amarisoft.com/lteenb.doc#Remote-API-1) and [Remote API](https://tech-academy.amarisoft.com/RemoteAPI.html)
@@ -103,7 +144,7 @@ async def get_help():
     
 
 @app.post("/{entity}", tags=['Generic'])
-async def generic_request(
+async def generic_request(  current_user: Annotated[User, Depends(get_current_active_user)],
                             entity: Annotated[str, Path] = "enb",
                             message: Annotated[dict, Body] = None):
     '''This generic endpoint serves a gateway for any **messages** described in the **[Remote API](https://tech-academy.amarisoft.com/RemoteAPI.html) documentation**
@@ -130,7 +171,7 @@ async def generic_request(
 # ********************************************************************************************************************************************
 
 @app.get("/network/service_reset", tags=["Amari management"])
-async def reset_service():
+async def reset_service(current_user: Annotated[User, Depends(get_current_active_user)]):
     '''**Reset** the AMARI service'''
 
     try:
@@ -144,7 +185,7 @@ async def reset_service():
     
 
 @app.get("/network/service_status", tags=["Amari management"])
-async def get_service_status():
+async def get_service_status(current_user: Annotated[User, Depends(get_current_active_user)]):
     '''**Get** the **status** of AMARI service'''
 
     try:
@@ -158,7 +199,7 @@ async def get_service_status():
     
 
 @app.get("/network/service_stop", tags=["Amari management"])
-async def stop_service():
+async def stop_service(current_user: Annotated[User, Depends(get_current_active_user)]):
     '''**Stops** the AMARI service'''
 
     try:
@@ -172,7 +213,7 @@ async def stop_service():
     
 
 @app.get("/network/service_start", tags=["Amari management"])
-async def start_service():
+async def start_service(current_user: Annotated[User, Depends(get_current_active_user)]):
     '''**Starts** the AMARI service'''
 
     try:
@@ -190,7 +231,7 @@ async def start_service():
 #*************************************************************************************************************************************
 
 @app.get("/enb/get_config", tags=["gNB"])
-async def get_eNB_config():
+async def get_eNB_config(current_user: Annotated[User, Depends(get_current_active_user)]):
     '''Sends a **gNB configuration** get message to the Websocket AMARI API'''
 
     try:
@@ -201,7 +242,8 @@ async def get_eNB_config():
 
 
 @app.post("/enb/set_gain", tags=["gNB"])
-async def set_cell_gain(ConfigGain: Annotated[ConfigGain, Body()]):
+async def set_cell_gain(current_user: Annotated[User, Depends(get_current_active_user)],
+                        ConfigGain: Annotated[ConfigGain, Body()]):
     '''Set the cell DL RF signal gain. The gain value is set in dB.
     
     The value of the key should be a dictionary containing the following fields:
@@ -221,7 +263,8 @@ async def set_cell_gain(ConfigGain: Annotated[ConfigGain, Body()]):
     
 
 @app.post("/enb/set_noise_level", tags=["gNB"])
-async def set_noise_level(ConfigGain: Annotated[ConfigNoise, Body()]):
+async def set_noise_level(current_user: Annotated[User, Depends(get_current_active_user)],
+                          ConfigGain: Annotated[ConfigNoise, Body()]):
     '''Set the noise level (relative to the CRS --Cell Reference Signal-- level, i.e., -SNR) of a cell in the gNB. This functionality only works if **channel simulator*** is '**enabled**.
     
     The value of the key should be a dictionary containing the following fields:
@@ -241,7 +284,8 @@ async def set_noise_level(ConfigGain: Annotated[ConfigNoise, Body()]):
 
 
 @app.post("/enb/set_inactivity_timer", tags=["gNB"])
-async def set_inactivity_timer(configuration: Annotated[ConfigCellTimer, Body()]):
+async def set_inactivity_timer(current_user: Annotated[User, Depends(get_current_active_user)],
+                               configuration: Annotated[ConfigCellTimer, Body()]):
     '''Set the inactivity timer of the gNB. It is mandatory to specify the **cell ID** as the key (e.g., `"1"`, `"2"`) of the configuration dictionary.
     
     The value of the key should be a dictionary containing the following fields:
@@ -262,7 +306,8 @@ async def set_inactivity_timer(configuration: Annotated[ConfigCellTimer, Body()]
     
 
 @app.post("/enb/set_prb_alloc", tags=["gNB"])
-async def set_prb_allocation(prb_allocation: Annotated[ConfigCellAlloc, Body(openapi_examples=examples_config_cell_alloc,)]):
+async def set_prb_allocation(current_user: Annotated[User, Depends(get_current_active_user)],
+                             prb_allocation: Annotated[ConfigCellAlloc, Body(openapi_examples=examples_config_cell_alloc,)]):
     '''Set the **Physical Resource Block (PRB)** allocation of the gNB. It is mandatory to specify the **cell ID** as the key (e.g., `"1"`, `"2"`) of the configuration dictionary.
     The value of the key should be a dictionary containing the following fields:
     * **pdsch_fixed_l_crb**: The number of PRBs allocated for PDSCH (DL).
@@ -289,7 +334,8 @@ async def set_prb_allocation(prb_allocation: Annotated[ConfigCellAlloc, Body(ope
 
 
 @app.post("/enb/set_mcs", tags=["gNB"])
-async def set_mcs(mcs: Annotated[ConfigCellMCS, Body(openapi_examples=examples_config_cell_mcs)]):
+async def set_mcs(current_user: Annotated[User, Depends(get_current_active_user)],
+                  mcs: Annotated[ConfigCellMCS, Body(openapi_examples=examples_config_cell_mcs)]):
     '''Set the **Modulation and Coding Scheme (MCS)** of the gNB/eNB. It is mandatory to specify the **cell ID** as the key (e.g., `"1"`, `"2"`) of the configuration dictionary.
     The value of the key should be a dictionary containing the following fields:
     * **pdsch_mcs**: The MCS value for PDSCH (DL).
@@ -310,7 +356,8 @@ async def set_mcs(mcs: Annotated[ConfigCellMCS, Body(openapi_examples=examples_c
     
 
 @app.post("/enb/get_stats", tags=["gNB"])
-async def get_stats(stats: Annotated[ConfigStats, Body()]):
+async def get_stats(current_user: Annotated[User, Depends(get_current_active_user)],
+                    stats: Annotated[ConfigStats, Body()]):
     '''Get the **stats** of the **gNB**. 
     
     The value of the key should be a dictionary containing the following fields:
@@ -332,7 +379,8 @@ async def get_stats(stats: Annotated[ConfigStats, Body()]):
     
 
 @app.post("/enb/get_channel_stats", tags=["gNB"])
-async def get_channel_stats(log_stats: Annotated[ConfigLogParser, Body(openapi_examples=examples_log_parser)]):
+async def get_channel_stats(current_user: Annotated[User, Depends(get_current_active_user)],
+                            log_stats: Annotated[ConfigLogParser, Body(openapi_examples=examples_log_parser)]):
     '''Get the gNB **channel stats** and information. It returns the parsed log messages stored in the gNB. It can be used to fetch the channel allocation.
     
     The value of the key should be a dictionary containing the following fields:
@@ -381,7 +429,7 @@ async def get_channel_stats(log_stats: Annotated[ConfigLogParser, Body(openapi_e
     
 
 @app.get("/enb/reset_log", tags=["gNB"])
-async def reset_log_amari():
+async def reset_log_amari(current_user: Annotated[User, Depends(get_current_active_user)]):
     '''**Resets** the **logs** of the gNB. This will clear all the logs stored in the gNB.'''
 
     try:
@@ -392,7 +440,8 @@ async def reset_log_amari():
     
 
 @app.post("/ue/get_stats", tags=["UE"])
-async def get_ue_stats(stats: Annotated[UeStats, Body()]):
+async def get_ue_stats(current_user: Annotated[User, Depends(get_current_active_user)],
+                       stats: Annotated[UeStats, Body()]):
     '''**Get** the **stats** of an **UE** connected to a eNB/gNB
     The value of the key may be a dictionary containing the following fields:
     * **ue_id**: The ID of the UE (e.g., `1`, `2`).
@@ -417,7 +466,7 @@ async def get_ue_stats(stats: Annotated[UeStats, Body()]):
 # ************************************************************************************************************************************** 
 
 @app.get("/core/get_config", tags=["Network core"])
-async def get_core_config():
+async def get_core_config(current_user: Annotated[User, Depends(get_current_active_user)]):
     '''Get the configuration of the core network (MME)'''
 
     try:
@@ -428,7 +477,7 @@ async def get_core_config():
 
 
 @app.get("/core/get_stats", tags=["Network core"])
-async def get_core_stats():
+async def get_core_stats(current_user: Annotated[User, Depends(get_current_active_user)]):
     '''Get the stats of the core network (MME)'''
 
     try:
@@ -439,7 +488,7 @@ async def get_core_stats():
 
 
 @app.get("/core/get_attached_gnb", tags=["Network core"])
-async def get_attached_gnb():
+async def get_attached_gnb(current_user: Annotated[User, Depends(get_current_active_user)]):
     '''Get the gNBs attached to the core network (MME)'''
 
     try:
@@ -450,7 +499,8 @@ async def get_attached_gnb():
     
     
 @app.post("/core/get_ue", tags=["Network core"])
-async def get_ue(ue: Annotated[UeCore, Body()]):
+async def get_ue(current_user: Annotated[User, Depends(get_current_active_user)],
+                 ue: Annotated[UeCore, Body()]):
     '''Get the stats of the UEs connected to the network core (MME). It is possible to filter by **IMSI (field "imsi")** or **IMEI (i.e., "imei")**. 
     If UE not found, it will return an empty list.'''
 
