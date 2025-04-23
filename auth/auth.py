@@ -38,6 +38,17 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 # Authorization models
 # ************************************************************************************************************************************************
 
+"""
+Models for user authentication and authorization.
+These models are used to define the structure of the data.
+- Token: Represents the access token and its type.
+- TokenData: Represents the data contained in the token.
+- User: Represents a user with username, email, full name, and disabled status.
+- UserInDB: Represents a user in the database with hashed password.
+
+TODO: User creation model
+"""
+
 class Token(BaseModel):
     access_token: str
     token_type: str
@@ -62,14 +73,44 @@ class UserInDB(User):
 # ************************************************************************************************************************************************
 
 def verify_password(plain_password, hashed_password):
+    """
+    Verify the password by comparing the plain password with the hashed password.
+    
+    Parameters:
+    - plain_password (str): The plain password to verify.
+    - hashed_password (str): The hashed password to compare against.
+    
+    Returns:
+    - bool: True if the password is correct, False otherwise.
+    """
     return pwd_context.verify(plain_password, hashed_password)
 
 
 def get_password_hash(password):
+    """
+    Hash the password using bcrypt.
+
+    Parameters:
+    - password (str): The password to hash.
+
+    Returns:
+    - str: The hashed password.
+    """
     return pwd_context.hash(password)
 
 
 def get_user(db, username: str):
+    """
+    Extract the user from the database by username.
+
+    Parameters:
+    - db: The database to search in.
+    - username (str): The username to search for.
+
+    Returns:
+    - UserInDB: The user object if found, None otherwise.
+    """
+
     if username in db:
         user_dict = db[username]
         return UserInDB(**user_dict)
@@ -148,8 +189,18 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
 
 
 async def get_current_active_user(
-    current_user: Annotated[User, Depends(get_current_user)],
-):
+    current_user: Annotated[User, Depends(get_current_user)]):
+    """
+    Check if the current user is enabled or disabled
+
+    Parameters:
+    - current_user (User): The current user object.
+
+    Returns:
+    - User: The current user object if the user is enabled.
+    Raises:
+    - HTTPException: If the user is disabled.
+    """
     if current_user.disabled:
         raise HTTPException(status_code=400, detail="Inactive user")
     return current_user
