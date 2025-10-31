@@ -1,5 +1,14 @@
 from pydantic import BaseModel, Field
 from typing import Dict, Annotated, Optional
+from typing import Union
+
+
+class TestFileName(BaseModel):
+    filename: str = Field(default="test_file", min_length=1)
+    file_extension: str = Field(default="json", min_length=1)
+    metrics_periodicity: int = Field(default=1, ge=1, le=3600)
+    duration: int | None = Field(default=60, ge=-1, le=86400)
+
 
 class ConfigDLPRB(BaseModel):
     rb_l_crb: int = Field(default=20, ge=1, le=106, alias="pdsch_fixed_l_crb") 
@@ -16,6 +25,7 @@ class ConfigULPRB(BaseModel):
 class ConfigGain(BaseModel):
     gain: int = Field(default=0, ge=-30)
     cell_id: int | None = Field(default=1, ge=1)
+
 
 
 class ConfigNoise(BaseModel):

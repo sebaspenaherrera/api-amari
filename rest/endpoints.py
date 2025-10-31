@@ -6,12 +6,15 @@ from fastapi.responses import FileResponse, Response
 from typing import Union, Annotated
 from starlette.responses import RedirectResponse
 from utils.network import NetworkTools as net
+from utils import utils
 from utils.cli import Cli as cli
 from auth.auth import fake_users_db, User, UserInDB, get_current_active_user, authenticate_user, create_access_token, Token, ACCESS_TOKEN_EXPIRE_MINUTES
 from datetime import timedelta
 import os
 import pandas as pd
 import subprocess
+import asyncio
+
 
 from utils.parser import Parser
 from .models import * 
@@ -60,6 +63,109 @@ You will be able to:
 * **Core** (_not implemented_).
 """
 app = FastAPI(title="Network-in-a-box API", version="1.0.0", summary="MobileNet API for Network-in-a-box service management", description=description)
+
+
+#*************************************************************************************************************************************
+#************************************************** DATASET CREATION *****************************************************************
+#*************************************************************************************************************************************
+
+@app.post("/start_recording_in_file", tags=["Dataset creation"])
+async def start_recording_in_file(  current_user: Annotated[User, Depends(get_current_active_user)],
+                           filename: Annotated[TestFileName, Body()]):
+    '''**Starts** recording a data of an experiment in a file.
+
+    The recording will be saved according to the parameters defined in the `filename` object.
+
+    The recording will include /enb/get_stats, /enb/get_channel_stats, /core/get_stats and /ue/get_stats every `metrics_periodicity` seconds for a total duration of `duration` seconds.
+    If duration is '-1', the recording will continue until the user stops it manually.
+
+    Parameters:
+    - filename: The name of the file to save the recording.
+    - file_extension: The extension of the file to save the recording.
+    - metrics_periodicity: The periodicity of the metrics collection.
+    - duration: The duration of the recording.
+
+    Returns:
+    - A message indicating the success or failure of the recording start.
+    '''
+
+    config = filename.model_dump(by_alias=True)
+
+
+    async def recording_task(filename: str, file_activation_path: str, metrics_periodicity: int, duration: int):
+        if duration < 0:
+            duration = None
+        utils.write_file_raw(path=filename, content="[\n", mode='w')
+        first = True
+        while utils.check_file(file_activation_path):
+            output_config = await get_eNB_config(current_user)
+            #await asyncio.sleep(0.5)
+            output_stats = await get_stats(current_user, ConfigStats())
+            #await asyncio.sleep(0.5)
+            output_channel_stats = await get_channel_stats(current_user, ConfigLogParser(channels=["PDSCH", "PUSCH"], layers={"PHY": {"level": "debug", "max_size": 1, "payload": False}}, max=1, min=1, short=True, allow_empty=True, discard_si=True))
+            #await asyncio.sleep(0.5)
+            output_core_stats = await get_core_stats(current_user)
+            #await asyncio.sleep(0.5)
+            output_ue_stats = await get_ue_stats(current_user, UeStats())
+            record = {
+                "timestamp": str(utils.get_time()),
+                "enb_config": output_config,
+                "enb_stats": output_stats,
+                "enb_channel_stats": output_channel_stats,
+                "core_stats": output_core_stats,
+                "ue_stats": output_ue_stats
+            }
+            print(f"Recording data to {filename} at {record['timestamp']}")
+            print(record)
+            # Append the record to the file
+            
+            if not first:
+                utils.write_file_raw(path=filename, content=",\n", mode='a')
+            else:
+                first = False
+
+            utils.write_file(path=filename, content=record, mode='a')
+            await asyncio.sleep(metrics_periodicity)
+            if duration:
+                duration -= metrics_periodicity
+                if duration <= 0:
+                    os.remove(file_activation_path)
+                    break
+
+        # Remove the last comma and close the JSON array
+
+        utils.write_file_raw(path=filename, content="\n]", mode='a')
+
+    try:
+        time_str = utils.get_time()
+        print(time_str)
+        path_base = utils.get_local_data_path()
+        utils.check_local_data_path(path_base)
+        filename_full = f"{path_base}/{config['filename']}_{time_str}.{config['file_extension']}"
+        file_activation_path = f"{path_base}/.recording_active"
+        filename_json = f"{{'filename': '{filename_full}'}}"
+        utils.write_file(path=file_activation_path, content=filename_json, mode='w')
+
+        await recording_task(filename=filename_full, file_activation_path=file_activation_path, metrics_periodicity=config['metrics_periodicity'], duration=config['duration'])
+
+    except subprocess.CalledProcessError as e:
+        raise HTTPException(status_code=500, detail=f"Command execution failed: {e}")
+
+
+@app.get("/stop_recording_in_file", tags=["Dataset creation"])
+async def stop_recording_in_file(current_user: Annotated[User, Depends(get_current_active_user)]):
+    '''**Stops** recording a data of an experiment in a file.
+
+    Returns:
+    - A message indicating the success or failure of the recording stop.
+    '''
+
+    try:
+        path_base = utils.get_local_data_path()
+        file_activation_path = f"{path_base}/.recording_active"
+        utils.delete_file(file_activation_path)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to stop recording: {e}")
 
 
 #*************************************************************************************************************************************

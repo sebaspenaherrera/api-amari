@@ -166,7 +166,8 @@ def write_file(path: str, content: json, mode: str = 'w'):
     '''
     
     # Check is the directory exists
-    check_local_data_path(ConfigManager.get_parameters('rest_data_path'))
+    #check_local_data_path(ConfigManager.get_parameters('rest_data_path'))
+    check_local_data_path(os.path.dirname(path))
     # check_local_data_path(Parameters.rest_data_path)
 
     # Check if the file already exists
@@ -177,6 +178,50 @@ def write_file(path: str, content: json, mode: str = 'w'):
         with open(path, mode='w') as file:
             json.dump(content, file, indent=4)
 
+
+def write_file_raw(path: str, content: str, mode: str = 'w'):
+    '''
+    Write a raw string content to a file
+
+    Parameters:
+    path: str. The path to the file
+    content: str. The content to be written
+    mode: str, default='w'. The mode to open the file
+
+    Returns:
+    - None
+    '''
+    
+    # Check is the directory exists
+    #check_local_data_path(ConfigManager.get_parameters('rest_data_path'))
+    check_local_data_path(os.path.dirname(path))
+    # check_local_data_path(Parameters.rest_data_path)
+
+    # Check if the file already exists
+    if check_file(path):
+        with open(path, mode=mode) as file:
+            file.write(content)
+    else:
+        with open(path, mode='w') as file:
+            file.write(content)
+
+def delete_file(path: str):
+    '''
+    Delete a file
+
+    Parameters:
+    - path: str. The path to the file
+
+    Returns:
+    - None
+    '''
+
+    # Check if the file exists
+    if check_file(path):
+        os.remove(path)
+        print("The file {} has been deleted".format(path))
+    else:
+        print("The file {} does not exist".format(path))
 
 def convert_dict_to_json(data: dict):
     '''
