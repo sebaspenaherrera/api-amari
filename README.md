@@ -191,6 +191,15 @@ Examples:
 
 ## 📜 References
 
+This API has been developed at the University of Málaga. To get useful information on how this can be utilized, please take a read of:
+
+[A Framework to boost the potential of network-in-a-box solutions](https://ieeexplore.ieee.org/abstract/document/9609861)
+[Measuring key quality indicators in cloud gaming: Framework and assessment over wireless networks](https://www.mdpi.com/1424-8220/21/4/1387)
+[Measuring and estimating key quality indicators in cloud gaming services](https://www.sciencedirect.com/science/article/pii/S1389128623002530)
+[KQI assessment of VR services: A case study on 360-video over 4G and 5G](https://ieeexplore.ieee.org/abstract/document/9833911)
+
+Additional information can be found in:
+
 [Amarisoft Remote API Documentation](https://tech-academy.amarisoft.com/RemoteAPI.html)
 
 [Amarisoft eNB/gNB Remote API](https://tech-academy.amarisoft.com/lteenb.doc#Remote-API-1)
