@@ -5,6 +5,7 @@ __pycache__/
 
 # Data folder
 data/
+data_backup
 
 # C extensions
 *.so

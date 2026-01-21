@@ -106,7 +106,7 @@ async def start_recording_in_file(  current_user: Annotated[User, Depends(get_cu
             #await asyncio.sleep(0.5)
             output_core_stats = await get_core_stats(current_user)
             #await asyncio.sleep(0.5)
-            output_ue_stats = await get_ue_stats(current_user, UeStats())
+            output_ue_stats = await get_ue_stats(current_user, UeStats(stats=True))
             record = {
                 "timestamp": str(utils.get_time()),
                 "enb_config": output_config,
@@ -137,7 +137,7 @@ async def start_recording_in_file(  current_user: Annotated[User, Depends(get_cu
         utils.write_file_raw(path=filename, content="\n]", mode='a')
 
     try:
-        time_str = utils.get_time()
+        time_str = str(utils.get_time()).strip().replace(":","-")
         print(time_str)
         path_base = utils.get_local_data_path()
         utils.check_local_data_path(path_base)
