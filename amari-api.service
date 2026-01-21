@@ -1,0 +1,13 @@
+[Unit]
+Description=Amari 5G Network-in-a-Box API
+After=network.target
+
+[Service]
+User=root
+WorkingDirectory=/home/user/api/git_PVS/api-amari
+Environment="PATH=/sbin:/bin:/usr/sbin:/usr/bin"
+ExecStart=/home/user/api/git_PVS/api-amari/start-api.sh
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
